@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111111">
-<title>BoxMaster BM-001 V1.01</title>
+<title>BoxMaster BM-001 V1.02</title>
 <script src="https://unpkg.com/@zxing/browser@latest"></script>
 <style>
 :root{--bg:#f5f6f8;--card:#fff;--text:#111;--muted:#667085;--line:#d7dbe2;--black:#111;--blue:#1455d9;--green:#147a3d;--red:#b42318;--amber:#b76e00}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}header{position:sticky;top:0;z-index:20;background:#111;color:#fff;padding:12px 14px;padding-top:calc(12px + env(safe-area-inset-top));box-shadow:0 2px 8px #0002}header h1{margin:0;font-size:17px}.sub{font-size:12px;opacity:.78;margin-top:2px}main{max-width:860px;margin:auto;padding:10px 10px 92px}.view{display:none}.view.active{display:block}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px;margin:10px 0;box-shadow:0 1px 3px #00000010}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.between{display:flex;align-items:center;justify-content:space-between;gap:8px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.stat{background:#fafafa;border:1px solid var(--line);border-radius:14px;padding:12px}.stat .n{font-size:25px;font-weight:800}.stat .l{font-size:12px;color:var(--muted)}button,input,textarea,select{font-size:16px;border-radius:12px;border:1px solid #b8bec8;background:#fff;padding:11px 12px}button{font-weight:750;cursor:pointer}button.primary{background:#111;color:#fff;border-color:#111}button.blue{background:var(--blue);color:#fff;border-color:var(--blue)}button.green{background:var(--green);color:#fff;border-color:var(--green)}button.red{background:var(--red);color:#fff;border-color:var(--red)}button.amber{background:var(--amber);color:#fff;border-color:var(--amber)}button.ghost{background:#fff;color:#111}button.small{font-size:13px;padding:7px 9px;border-radius:10px}button.full{width:100%}input,textarea,select{width:100%}textarea{min-height:72px}.muted{color:var(--muted);font-size:13px}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.pill{display:inline-flex;align-items:center;gap:5px;border:1px solid #b8bec8;border-radius:999px;padding:8px 10px;background:#fff;font-weight:750}.pill.closed{opacity:.55;text-decoration:line-through}.notice{border-radius:16px;padding:14px;color:#fff}.notice.a{background:var(--green)}.notice.b{background:var(--blue)}.notice.err{background:var(--red)}.big{font-size:28px;font-weight:850}.boxbtn{min-width:82px}.thumb{width:100%;max-height:260px;object-fit:contain;background:#eee;border-radius:14px;border:1px solid var(--line)}.mini{width:72px;height:72px;object-fit:cover;border-radius:12px;border:1px solid var(--line);background:#eee}.list{border-top:1px solid var(--line);margin-top:8px}.item{padding:10px 0;border-bottom:1px solid var(--line)}#videoWrap{display:none;background:#000;border-radius:16px;overflow:hidden;position:relative}video{width:100%;display:block;max-height:48vh;object-fit:cover}.scanLabel{position:absolute;top:10px;left:10px;background:#000a;color:#fff;padding:6px 9px;border-radius:999px;font-size:12px}.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:#cfd4dc;padding-bottom:env(safe-area-inset-bottom)}.tabs button{border:0;border-radius:0;background:#fff;font-size:12px;padding:11px 2px}.tabs button.active{background:#111;color:#fff}.dangerZone{border-color:#f1b8b3;background:#fff8f7}@media(min-width:720px){.stats{grid-template-columns:repeat(5,1fr)}.grid{grid-template-columns:repeat(4,1fr)}}
 </style>
 </head>
 <body>
-<header><h1>📦 BoxMaster BM-001</h1><div class="sub">V1.01 / JAN整理・3個残し・箱別数量管理</div></header>
+<header><h1>📦 BoxMaster BM-001</h1><div class="sub">V1.02 / JAN整理・3個残し・箱別数量管理</div></header>
 <main>
 <section id="home" class="view active"></section>
 <section id="scan" class="view"></section>
@@ -56,13 +56,15 @@ function vibrate(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
 async function startScan(mode){
   scanMode=mode;
   scanLocked=false;
-  const wrap=document.getElementById('videoWrap');
+  stopScan(); // 以前のカメラ状態を必ず破棄する。iPhoneで2回目にインカメラへ戻る対策。
+  const activeView=document.querySelector('.view.active') || document;
+  const wrap=activeView.querySelector('#videoWrap');
+  const video=activeView.querySelector('video');
+  if(!wrap || !video){alert('カメラ画面が見つかりません');return}
   wrap.style.display='block';
   try{
     scanner=new ZXingBrowser.BrowserMultiFormatReader();
-    const devices=await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
-    const back=devices.find(d=>/back|rear|environment/i.test(d.label))||devices[0];
-    await scanner.decodeFromVideoDevice(back?.deviceId,'video',(result,err,controls)=>{
+    const onResult=(result,err,controls)=>{
       if(!result || scanLocked) return;
       const code=String(result.getText()||'').replace(/\D/g,'');
       const now=Date.now();
@@ -73,13 +75,48 @@ async function startScan(mode){
       try{controls&&controls.stop&&controls.stop()}catch(e){}
       stopScan();
       if(scanMode==='search') searchJan(code); else handleCode(code);
-    })
-  }catch(e){
-    scanLocked=false;
-    alert('カメラ読取を開始できません。HTTPSで開いているか確認してください。\n'+e.message)
+    };
+    // iPhone Safariではデバイス一覧の先頭がインカメラになることがあるため、まず環境カメラを明示指定する。
+    const constraints={video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false};
+    if(scanner.decodeFromConstraints){
+      await scanner.decodeFromConstraints(constraints,video,onResult);
+    }else{
+      const stream=await navigator.mediaDevices.getUserMedia(constraints);
+      video.srcObject=stream;
+      await video.play();
+      await scanner.decodeFromVideoElement(video,onResult);
+    }
+  }catch(e1){
+    // 端末によっては facingMode 指定が失敗するため、背面らしいデバイスIDへフォールバック。
+    try{
+      scanner=new ZXingBrowser.BrowserMultiFormatReader();
+      const devices=await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+      const back=devices.find(d=>/back|rear|environment|背面|後面/i.test(d.label))||devices[devices.length-1]||devices[0];
+      await scanner.decodeFromVideoDevice(back?.deviceId,video,(result,err,controls)=>{
+        if(!result || scanLocked) return;
+        const code=String(result.getText()||'').replace(/\D/g,'');
+        const now=Date.now();
+        if(code===lastScanCode && now-lastScanAt<2500) return;
+        scanLocked=true;
+        lastScanCode=code;
+        lastScanAt=now;
+        try{controls&&controls.stop&&controls.stop()}catch(e){}
+        stopScan();
+        if(scanMode==='search') searchJan(code); else handleCode(code);
+      })
+    }catch(e2){
+      scanLocked=false;
+      alert('カメラ読取を開始できません。HTTPSで開いているか、カメラ許可を確認してください。\n'+(e2.message||e1.message))
+    }
   }
 }
-function stopScan(){try{scanner&&scanner.reset&&scanner.reset()}catch(e){} scanner=null;scanLocked=false;document.querySelectorAll('#videoWrap').forEach(w=>w.style.display='none')}
+function stopScan(){
+  try{scanner&&scanner.reset&&scanner.reset()}catch(e){}
+  document.querySelectorAll('video').forEach(v=>{try{if(v.srcObject){v.srcObject.getTracks().forEach(t=>t.stop());v.srcObject=null}}catch(e){}});
+  scanner=null;
+  scanLocked=false;
+  document.querySelectorAll('#videoWrap').forEach(w=>w.style.display='none')
+}
 function addBox(){snapshot('箱追加');const id=nextBoxId();state.boxes.push({id,status:'open',photo:''});state.last=`箱追加 ${id}`;save();render()}
 function setBoxStatus(id,status){snapshot('箱状態変更 '+id);box(id).status=status;state.last=`${id} ${status==='open'?'再開':'完了'}`;save();render()}
 function renderSearch(){document.getElementById('search').innerHTML=`<div class="card"><b>検索</b><div class="muted">JAN入力またはカメラ読取で検索。</div><div id="videoWrap" style="margin-top:10px"><video id="video" playsinline></video><div class="scanLabel">検索読取中</div></div><div class="row" style="margin-top:10px"><button class="primary" onclick="startScan('search')">カメラで検索</button><button onclick="stopScan()">停止</button></div><div class="row" style="margin-top:10px"><input id="searchJan" inputmode="numeric" placeholder="JAN"><button onclick="searchJan(document.getElementById('searchJan').value)">検索</button></div></div><div id="searchResult">${selectedJan?productDetailHtml(selectedJan):''}</div>`}
